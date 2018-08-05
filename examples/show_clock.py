@@ -26,8 +26,8 @@
 
 import socket
 import sys
-import pakbus
-from bintools import str2int
+import examples.pakbus as pakbus
+from examples.bintools import str2int
 
 #
 # Initialize parameters
@@ -42,7 +42,7 @@ parser.add_option('-c', '--config', help = 'read configuration from FILE [defaul
 # Read configuration file
 import ConfigParser, StringIO
 cf = ConfigParser.SafeConfigParser()
-print 'configuration read from %s' % cf.read(options.config)
+print ('configuration read from %s' % cf.read(options.config))
 
 # Data logger PakBus Node Id
 NodeId = str2int(cf.get('pakbus', 'node_id'))
@@ -53,9 +53,9 @@ MyNodeId = str2int(cf.get('pakbus', 'my_node_id'))
 s = pakbus.open_socket(cf.get('pakbus', 'host'), cf.getint('pakbus', 'port'), cf.getint('pakbus', 'timeout'))
 
 # check if remote node is up
-msg = pakbus.ping_node(s, NodeId, MyNodeId)
-if not msg:
-    raise Warning('no reply from PakBus node 0x%.3x' % NodeId)
+# msg = pakbus.ping_node(s, NodeId, MyNodeId)
+# if not msg:
+#     raise Warning('no reply from PakBus node 0x%.3x' % NodeId)
 
 #
 # Main program
@@ -65,8 +65,8 @@ if not msg:
 tdiff, adjust = pakbus.clock_sync(s, NodeId, MyNodeId)
 
 import time
-print 'PC clock:     ', time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())
-print 'CR1000 clock: ', time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime(time.time() + tdiff)), '(tdiff: %+f seconds)' % tdiff
+print ('PC clock:     ', time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime()))
+print ('CR1000 clock: ', time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime(time.time() + tdiff)), '(tdiff: %+f seconds)' % tdiff)
 
 # say good bye and close socket
 pakbus.send(s, pakbus.pkt_bye_cmd(NodeId, MyNodeId))

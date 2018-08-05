@@ -20,6 +20,7 @@
 #
 import struct
 import string
+import sys
 
 
 #
@@ -64,7 +65,8 @@ datatype = {
 #
 # Global variables
 #
-if not vars().has_key('transact'):
+
+if not 'transact' in vars():
     transact = 0     # Running 8-bit transaction counter (initialized only if it does not exist)
 
 
@@ -80,6 +82,8 @@ def send(s, pkt):
     # pkt: unquoted, unframed PakBus packet (just header + message)
     frame = quote(pkt + calcSigNullifier(calcSigFor(pkt)))
     s.send('\xBD' + frame + '\xBD')
+    t = len(frame)
+    print("frame size is : ", t, frame)
 
 
 #
@@ -93,15 +97,19 @@ def recv(s):
     # s: socket object
     pkt = ''
     byte = None
-    while byte != '\xBD': byte = s.recv(1) # Read until first \xBD frame character
+    while byte != '\xBD': byte = s.recv(1)# Read until first \xBD frame character
     while byte == '\xBD': byte = s.recv(1) # Read unitl first character other than \xBD
     while byte != '\xBD': # Read until next occurence of \xBD character
         pkt += byte
         byte = s.recv(1)
+    print("recv pkt : ", pkt)
     pkt = unquote(pkt)  # Unquote quoted characters
-    if calcSigFor(pkt): # Calculate signature (should be zero)
+    print("unquote recv pkt : ", pkt)
+    if calcSigFor(pkt):
+        print ("check recv")# Calculate signature (should be zero)
         return None     # Signature not zero!
     else:
+        print("check else return", pkt[:-2])
         return pkt[:-2] # Strip last 2 signature bytes and return packet
 
 
@@ -145,6 +153,7 @@ def PakBus_hdr(DstNodeId, SrcNodeId, HiProtoCode, ExpMoreCode = 0x2, LinkState =
         (HiProtoCode & 0xF) << 12 | (DstNodeId & 0xFFF),
         (HopCnt & 0xF) << 12      | (SrcNodeId & 0xFFF)
     )
+
     return hdr
 
 
@@ -178,6 +187,7 @@ def calcSigNullifier(sig):
         if sig2 >= 0x100: sig2 += 1
         nulb = chr((0x100 - (sig2 + (sig >>8))) & 0xFF)
         nullif += nulb
+
     return nullif
 
 #
@@ -248,6 +258,7 @@ def pkt_hello_response(DstNodeId, SrcNodeId, TranNbr, IsRouter = 0x00, HopMetric
     # VerifyIntv:   Link verification interval in seconds (default: 30 minutes)
 
     hdr = PakBus_hdr(DstNodeId, SrcNodeId, 0x0) # PakBus Control Packet
+    #print("Hello respone : ", TranNbr)
     msg = encode_bin(['Byte', 'Byte', 'Byte', 'Byte', 'UInt2'], [0x89, TranNbr, IsRouter, HopMetric, VerifyIntv])
     pkt = hdr + msg
     return pkt
@@ -602,6 +613,7 @@ def msg_fileupload_response(msg):
 
     [msg['RespCode'], msg['FileOffset']], size = decode_bin(['Byte', 'UInt4'], msg['raw'][2:7])
     msg['FileData'] = msg['raw'][7:] # return raw file data for later parsing
+    print ("msg_fileupload_response :  File Offset : ", msg['FileOffset'])
     return msg
 
 
@@ -745,6 +757,7 @@ def parse_tabledef(raw):
     TableDef = []   # List of table definitions
 
     offset = 0  # offset into raw buffer
+    #print("Parse_TableDef")
     FslVersion, size = decode_bin(['Byte'], raw[offset:])
     offset += size
 
@@ -857,6 +870,7 @@ def pkt_collectdata_cmd(DstNodeId, SrcNodeId, TableNbr, TableDefSig, FieldNbr = 
     fieldlist = FieldNbr + [0]
     msg += encode_bin(len(fieldlist) * ['UInt2'], fieldlist)
 
+
     pkt = hdr + msg
     return pkt, TranNbr
 
@@ -953,6 +967,7 @@ def parse_collectdata(raw, tabledef, FieldNbr = []):
                         record['Fields'][fieldname], size = decode_bin([fieldtype], raw[offset:], dimension)
                     else:
                         record['Fields'][fieldname], size = decode_bin(dimension * [fieldtype], raw[offset:])
+
                     offset += size
                 frag['RecFrag'].append(record)
 
@@ -1003,7 +1018,6 @@ def pkt_getvalues_cmd(DstNodeId, SrcNodeId, TableName, Type, FieldName, Swath = 
     # FieldName:    Field name (including index if applicable)
     # Swath:        Number of columns to retrieve from an indexed field
     # SecurityCode: 16-bit security code (optional)
-
     TranNbr = newTranNbr()  # Generate new transaction number
     hdr = PakBus_hdr(DstNodeId, SrcNodeId, 0x1) # BMP5 Application Packet
     msg = encode_bin(['Byte', 'Byte', 'UInt2', 'ASCIIZ', 'Byte', 'ASCIIZ', 'UInt2'], [0x1a, TranNbr, SecurityCode, TableName, datatype[Type]['code'], FieldName, Swath])
@@ -1188,7 +1202,9 @@ def nsec_to_time(nsec, epoch = nsec_base, tick = nsec_tick):
     # nsec:  NSec value
 
     # Calculate timestamp with fractional seconds
+    print("Epoch : " ,epoch)
     timestamp = epoch + nsec[0] + nsec[1] * tick
+    print("TimeStamp : ", timestamp)
     return timestamp
 
 
@@ -1202,6 +1218,7 @@ def time_to_nsec(timestamp, epoch = nsec_base, tick = nsec_tick):
 
     # separate fractional and integer part of timestamp
     import math
+
     [fp, ip] = math.modf(timestamp)
 
     # Calculate two integer values for NSec
@@ -1235,9 +1252,13 @@ def clock_sync(s, DstNodeId, SrcNodeId, SecurityCode = 0x0000, min_adjust = 0.1,
 
         # Calculate time difference
         if msg.has_key('Time'):
+            print("(((((((Message Has Key!!")
+            print("Time ", msg['Time'])
             logtime = nsec_to_time(msg['Time']) - offset # time reported from data logger (UTC)
             delay = (t2 - t1) / 2 # time estimated delay from communication protocol
+
             td.append(logtime - reftime + delay) # build delay-corrected list of time differences
+            print("Check Time ", td)
         else:
             break
 
@@ -1302,20 +1323,27 @@ def wait_pkt(s, SrcNodeId, DstNodeId, TranNbr, timeout = 5):
             rcv = recv(s)
         except socket.timeout:
             rcv = ''
-        hdr, msg = decode_pkt(rcv)
 
+
+        hdr, msg = decode_pkt(rcv)
+        #print ("Rcv : ", rcv)
+        #print("Message Type is ", msg['MsgType'])
+        #print("MsgType : ", msg['MsgType'], "HiProtocal : ", hdr['HiProtoCode'], "TranNbr : ", msg['TranNbr'], "Priority : ", hdr['Priority'])
         # ignore packets that are not for us
         if hdr['DstNodeId'] != DstNodeId or hdr['SrcNodeId'] != SrcNodeId:
+            print("check 1")
             continue
 
         # Respond to incoming hello command packets
         if msg['MsgType'] == 0x09:
+            print("check2")
             pkt = pkt_hello_response(hdr['SrcNodeId'], hdr['DstNodeId'], msg['TranNbr'])
             send(s, pkt)
             continue
 
         # Handle "please wait" packets
         if msg['TranNbr'] == TranNbr and msg['MsgType'] == 0xa1:
+            print("check3")
             timeout = msg['WaitSec']
             max_time += timeout
             continue
@@ -1367,7 +1395,7 @@ def filedownload(s, DstNodeId, SrcNodeId, FileName, FileData, SecurityCode = 0x0
         try:
             RespCode = msg['RespCode']
             # End loop if response code <> 0
-            if RespCode <> 0:
+            if RespCode != 0:
                 break
             # Append file data
             FileOffset += Swath
@@ -1394,24 +1422,32 @@ def fileupload(s, DstNodeId, SrcNodeId, FileName, SecurityCode = 0x0000):
     # Send file upload command packets until no more data is returned
     FileOffset = 0x00000000
     TranNbr = None
+    count = 0
     while True:
 
         # Upload chunk from file starting at FileOffset
         pkt, TranNbr = pkt_fileupload_cmd(DstNodeId, SrcNodeId, FileName, FileOffset = FileOffset, TranNbr = TranNbr, CloseFlag = 0x00)
+        #print("Check PKT : ", pkt)
+        #print("Check TranNbr : ", TranNbr)
         send(s, pkt)
         hdr, msg = wait_pkt(s, DstNodeId, SrcNodeId, TranNbr)
+        #print("msg : ", msg)
 
         try:
             RespCode = msg['RespCode']
+            print("RespCode ", msg['RespCode'])
             # End loop if no more data is returned
             if not msg['FileData']:
                 break
             # Append file data
             FileData += msg['FileData']
+            print("FileOffset check : ", FileOffset)
             FileOffset += len(msg['FileData'])
         except KeyError:
-            break
 
+            break
+        print("count : ", count)
+        count = count + 1
     return FileData, RespCode
 
 
@@ -1429,13 +1465,16 @@ def getvalues(s, DstNodeId, SrcNodeId, TableName, Type, FieldName, Swath = 1, Se
     # SecurityCode: 16-bit security code (optional)
 
     # Send Get Values Command and wait for repsonse
+    print("GetValues")
     try:
         pkt, TranNbr = pkt_getvalues_cmd(DstNodeId, SrcNodeId, TableName, Type, FieldName, Swath, SecurityCode)
+        print("check")
         send(s, pkt)
         hdr, msg = wait_pkt(s, DstNodeId, SrcNodeId, TranNbr)
         values = msg_getvalues_response(msg)['Values']
         parse = parse_values(values, Type)
     except:
+        print("Except")
         parse = [ None ]
 
     # Return list with retrieved values
@@ -1459,6 +1498,7 @@ def collect_data(s, DstNodeId, SrcNodeId, TableDef, TableName, FieldNames = [], 
 
     # Get table number
     tablenbr = get_TableNbr(TableDef, TableName)
+    print("Table enbr", tablenbr)
     if tablenbr is None:
         raise StandardError('table %s not found in table definition' % TableName)
 
@@ -1490,6 +1530,8 @@ def collect_data(s, DstNodeId, SrcNodeId, TableDef, TableName, FieldNames = [], 
     send(s, pkt)
     hdr, msg = wait_pkt(s, DstNodeId, SrcNodeId, TranNbr)
     RecData, MoreRecsExist = parse_collectdata(msg['RecData'], TableDef, FieldNbr = fieldnbr)
+
+    #print ("RecData : ", RecData)
 
     # Return parsed record data and flag if more records exist
     return RecData, MoreRecsExist
@@ -1529,11 +1571,12 @@ def open_socket(Host, Port = 6785, Timeout = 30):
     # Timeout:  Socket timeout
 
     import socket
+
     for res in socket.getaddrinfo(Host, Port, socket.AF_UNSPEC, socket.SOCK_STREAM):
         af, socktype, proto, canonname, sa = res
         try:
             s = socket.socket(af, socktype, proto)
-        except socket.error, msg:
+        except socket.error as msg:
             s = None
             continue
         try:
@@ -1559,6 +1602,9 @@ def ping_node(s, DstNodeId, SrcNodeId):
     # SrcNodeId:    Source node ID (12-bit int)
 
     # send hello command and wait for response packet
+    print(DstNodeId)
+    print(SrcNodeId)
+    print("Check Ping_node")
     pkt, TranNbr = pkt_hello_cmd(DstNodeId, SrcNodeId)
     send(s, pkt)
     hdr, msg = wait_pkt(s, DstNodeId, SrcNodeId, TranNbr)

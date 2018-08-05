@@ -26,8 +26,8 @@
 
 import socket
 import sys
-import pakbus
-from bintools import str2int
+import examples.pakbus as pakbus
+from examples.bintools import str2int
 
 #
 # Initialize parameters
@@ -42,7 +42,7 @@ parser.add_option('-c', '--config', help = 'read configuration from FILE [defaul
 # Read configuration file
 import ConfigParser, StringIO
 cf = ConfigParser.SafeConfigParser()
-print 'configuration read from %s' % cf.read(options.config)
+print ('configuration read from %s' % cf.read(options.config))
 
 # Data logger PakBus Node Id
 NodeId = str2int(cf.get('pakbus', 'node_id'))
@@ -64,7 +64,7 @@ if not msg:
 pkt, TranNbr = pakbus.pkt_getprogstat_cmd(NodeId, MyNodeId)
 pakbus.send(s, pkt)
 hdr, msg = pakbus.wait_pkt(s, NodeId, MyNodeId, TranNbr)
-print msg
+print (msg)
 
 # say good bye
 pakbus.send(s, pakbus.pkt_bye_cmd(NodeId, MyNodeId))

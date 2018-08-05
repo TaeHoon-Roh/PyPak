@@ -26,8 +26,8 @@
 
 import socket
 import sys
-import pakbus
-from bintools import str2int
+import examples.pakbus as pakbus
+from examples.bintools import str2int
 
 #
 # Initialize parameters
@@ -42,20 +42,21 @@ parser.add_option('-c', '--config', help = 'read configuration from FILE [defaul
 # Read configuration file
 import ConfigParser, StringIO
 cf = ConfigParser.SafeConfigParser()
-print 'configuration read from %s' % cf.read(options.config)
-
+print('configuration read from %s' % cf.read(options.config))
 # Data logger PakBus Node Id
 NodeId = str2int(cf.get('pakbus', 'node_id'))
+print(NodeId)
 # My PakBus Node Id
 MyNodeId = str2int(cf.get('pakbus', 'my_node_id'))
+print(MyNodeId)
 
 # Open socket
 s = pakbus.open_socket(cf.get('pakbus', 'host'), cf.getint('pakbus', 'port'), cf.getint('pakbus', 'timeout'))
 
 # check if remote node is up
-msg = pakbus.ping_node(s, NodeId, MyNodeId)
-if not msg:
-    raise Warning('no reply from PakBus node 0x%.3x' % NodeId)
+#msg = pakbus.ping_node(s, NodeId, MyNodeId)
+#if not msg:
+#    raise Warning('no reply from PakBus node 0x%.3x' % NodeId)
 
 #
 # Main program
@@ -67,12 +68,18 @@ FileData, RespCode = pakbus.fileupload(s, NodeId, MyNodeId, FileName = '.TDF')
 if FileData:
     tabledef = pakbus.parse_tabledef(FileData)
     for tableno in range(1, len(tabledef) + 1):
-        print 'Table %d: %s' % (tableno, tabledef[tableno - 1]['Header']['TableName'])
-        print 'Table signature: 0x%X' % tabledef[tableno - 1]['Signature']
-        print 'Header:', tabledef[tableno - 1]['Header']
+        print ('Table %d: %s' % (tableno, tabledef[tableno - 1]['Header']['TableName']))
+        print ('Table signature: 0x%X' % tabledef[tableno - 1]['Signature'])
+        print ('Header:', tabledef[tableno - 1]['Header'])
         for fieldno in range(1, len(tabledef[tableno - 1]['Fields']) + 1):
-            print 'Field %d:' % (fieldno), tabledef[tableno - 1]['Fields'][fieldno - 1]
+            print ('Field %d:' % (fieldno), tabledef[tableno - 1]['Fields'][fieldno - 1])
         print
+
+#value = pakbus.getvalues(s, NodeId, MyNodeId, TableName='Public',Type='IEEE4B', FieldName='Battv')
+#print("Value", value)
+a, b = pakbus.collect_data(s, NodeId, MyNodeId, tabledef, TableName= 'Public')
+print(a)
+
 
 # say good bye
 pkt = pakbus.pkt_bye_cmd(NodeId, MyNodeId)
